@@ -1,6 +1,6 @@
-package com.sintef.asam;
+package com.conyers.dam;
 
-import com.sintef.asam.util.Version;
+import com.conyers.dam.util.Version;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.source.SourceConnector;

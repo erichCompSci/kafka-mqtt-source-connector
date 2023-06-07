@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.sintef.asam</groupId>
+    <groupId>com.conyers.dam</groupId>
     <artifactId>kafka-mqtt-source-connector</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -15,6 +15,12 @@
             <name>Åsmund Hugo</name>
             <organization>SINTEF</organization>
             <email>aasmund.hugo@sintef.no</email>
+        </developer>
+        <developer>
+            <id>erichCompSci</id>
+            <name>Erich Lohrmann</name>
+            <organization>Conyers</organization>
+            <email>erichlohrmann@gmail.com</email>
         </developer>
     </developers>
 
@@ -30,7 +36,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.sintef.asam.MqttSourceConnector</mainClass>
+                            <mainClass>com.conyers.dam.MqttSourceConnector</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
@@ -55,8 +61,8 @@
     <dependencies>
         <dependency>
             <groupId>org.eclipse.paho</groupId>
-            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-            <version>1.2.1</version>
+            <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+            <version>1.2.5</version>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -83,11 +89,13 @@
             <artifactId>bcpkix-jdk15on</artifactId>
             <version>1.64</version>
         </dependency>
+	<!--
 	<dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>bson</artifactId>
             <version>4.0.2</version>
         </dependency>
+	-->
     </dependencies>
 
 </project>

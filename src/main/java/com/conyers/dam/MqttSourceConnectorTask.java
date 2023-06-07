@@ -1,14 +1,16 @@
-package com.sintef.asam;
+package com.conyers.dam;
 
-import com.sintef.asam.util.SSLUtils;
-import com.sintef.asam.util.Version;
+import com.conyers.dam.util.SSLUtils;
+import com.conyers.dam.util.Version;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.eclipse.paho.client.mqttv3.*;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.client.*;
+import org.eclipse.paho.mqttv5.common.*;
+import org.eclipse.paho.mqttv5.common.packet.*;
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.util.ArrayList;
@@ -20,8 +22,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-
-import org.bson.Document;
 
 public class MqttSourceConnectorTask extends SourceTask implements MqttCallback {
 
@@ -37,12 +37,11 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     private void initMqttClient() {
 
-        MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
-        mqttConnectOptions.setMqttVersion(MqttConnectOptions.MQTT_VERSION_3_1_1);
+        MqttConnectionOptions mqttConnectOptions = new MqttConnectionOptions();
         mqttConnectOptions.setServerURIs(new String[] {connectorConfiguration.getString("mqtt.connector.broker.uri")});
         mqttConnectOptions.setConnectionTimeout(connectorConfiguration.getInt("mqtt.connector.connection_timeout"));
         mqttConnectOptions.setKeepAliveInterval(connectorConfiguration.getInt("mqtt.connector.keep_alive"));
-        mqttConnectOptions.setCleanSession(connectorConfiguration.getBoolean("mqtt.connector.clean_session"));
+        mqttConnectOptions.setCleanStart(connectorConfiguration.getBoolean("mqtt.connector.clean_session"));
         mqttConnectOptions.setKeepAliveInterval(connectorConfiguration.getInt("mqtt.connector.connection_timeout"));
         if (connectorConfiguration.getBoolean("mqtt.connector.ssl")) {
             logger.info("SSL TRUE for MqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
@@ -109,10 +108,10 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     }
 
-    @Override
+    /*@Override
     public void connectionLost(Throwable throwable) {
         logger.error("Connection for connector: '{}', running client: '{}', lost to topic: '{}'.", connectorName, mqttClientId, mqttTopic);
-    }
+    }*/
 
     @Override
     public void messageArrived(String tempMqttTopic, MqttMessage mqttMessage) {
@@ -122,9 +121,9 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
             //mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
             //        Schema.STRING_SCHEMA, addTopicToJSONByteArray(mqttMessage.getPayload(), tempMqttTopic))
             //);
-            mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
+            /*mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
                     Schema.STRING_SCHEMA, makeDBDoc(mqttMessage.getPayload(), tempMqttTopic))
-            );
+            );*/
         } catch (Exception e) {
             logger.error("ERROR: Not able to create source record from mqtt message '{}' arrived on topic '{}' for client '{}'.", mqttMessage.toString(), tempMqttTopic, mqttClientId);
             logger.error(e);
@@ -132,8 +131,28 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
     }
 
     @Override
-    public void deliveryComplete(IMqttDeliveryToken iMqttDeliveryToken) {
+    public void disconnected(MqttDisconnectResponse mqttDisconnectResponse) {
+        logger.error("Received a graceful disconnect, should we do something graceful here?");
+    }
 
+    @Override
+    public void mqttErrorOccurred(MqttException exception) {
+        logger.error("Mqtt error occurred: '{}'", exception.getMessage());
+    }
+
+    @Override
+    public void deliveryComplete(IMqttToken iMqttToken) {
+
+    }
+
+    @Override
+    public void connectComplete(boolean reconnect, String serverURI) {
+        logger.error("Connect complete has not been implemented...but is it needed?");
+    }
+
+    @Override
+    public void authPacketArrived(int reasonCode, MqttProperties properties) {
+        logger.error("This has not been implemented yet, do we need it?");
     }
 
     private byte[] addTopicToJSONByteArray(byte[] bytes, String topic) {
@@ -152,7 +171,9 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
         return byteArrayWithTopic;
     }
 
-    private String makeDBDoc(byte[] payload, String topic) {
+    //This is old nonsense code, but I'm keeping it around just in case it has 
+    //valuable information
+    /*private String makeDBDoc(byte[] payload, String topic) {
       String msg = new String(payload);
       Document message = Document.parse(msg);
       Document doc = new Document();
@@ -168,5 +189,5 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
       doc.put("updateDate",dt);
       doc.put("pushed",false);
       return doc.toJson();
-    }
+    }*/
 }

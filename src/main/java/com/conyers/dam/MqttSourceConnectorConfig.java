@@ -1,4 +1,4 @@
-package com.sintef.asam;
+package com.conyers.dam;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;

@@ -1,4 +1,4 @@
-package com.sintef.asam.util;
+package com.conyers.dam.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package com.sintef.asam.util;
+package com.conyers.dam.util;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMDecryptorProvider;
