@@ -5,8 +5,8 @@ import com.conyers.dam.util.Version;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.eclipse.paho.mqttv5.client.*;
 import org.eclipse.paho.mqttv5.common.*;
 import org.eclipse.paho.mqttv5.common.packet.*;
@@ -33,10 +33,13 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
     private MqttSourceConnectorConfig connectorConfiguration;
     private SSLSocketFactory sslSocketFactory;
     BlockingQueue<SourceRecord> mqttRecordQueue = new LinkedBlockingQueue<SourceRecord>();
-    private static final Logger logger = LogManager.getLogger(MqttSourceConnectorTask.class);
+    private static final Logger logger = LoggerFactory.getLogger(MqttSourceConnectorTask.class);
 
     private void initMqttClient() {
 
+        System.out.println("TESTING DOES THIS HIT...");
+        logger.info("Init mqtt client called");
+        logger.debug("Seeing the debug values...");
         MqttConnectionOptions mqttConnectOptions = new MqttConnectionOptions();
         mqttConnectOptions.setServerURIs(new String[] {connectorConfiguration.getString("mqtt.connector.broker.uri")});
         mqttConnectOptions.setConnectionTimeout(connectorConfiguration.getInt("mqtt.connector.connection_timeout"));
@@ -54,7 +57,7 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
                 mqttConnectOptions.setSocketFactory(sslSocketFactory);
             } catch (Exception e) {
                 logger.error("Not able to create SSLSocketfactory: '{}', for mqtt client: '{}', and connector: '{}'", sslSocketFactory, mqttClientId, connectorName);
-                logger.error(e);
+                //logger.error(e.to_string());
             }
         } else {
             logger.info("SSL FALSE for MqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
@@ -67,7 +70,7 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
             logger.info("SUCCESSFULL MQTT CONNECTION for AsamMqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
         } catch (MqttException e) {
             logger.error("FAILED MQTT CONNECTION for AsamMqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
-            logger.error(e);
+            //logger.error(e);
         }
 
         try {
@@ -98,6 +101,7 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
+        logger.info("Poll has been called...");
         List<SourceRecord> records = new ArrayList<>();
         records.add(mqttRecordQueue.take());
         return records;
@@ -105,7 +109,7 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     @Override
     public void stop() {
-
+        logger.info("Stop has been called...");
     }
 
     /*@Override
@@ -115,7 +119,9 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     @Override
     public void messageArrived(String tempMqttTopic, MqttMessage mqttMessage) {
+        System.out.println("MESSAGE ARRIVED...");
         logger.debug("Mqtt message arrived to connector: '{}', running client: '{}', on topic: '{}'.", connectorName, mqttClientId, tempMqttTopic);
+        logger.info("Mqtt message arrived to connector: '{}', running client: '{}', on topic: '{}'.", connectorName, mqttClientId, tempMqttTopic);
         try {
             logger.debug("Mqtt message payload in byte array: '{}'", mqttMessage.getPayload());
             //mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
@@ -126,7 +132,7 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
             );*/
         } catch (Exception e) {
             logger.error("ERROR: Not able to create source record from mqtt message '{}' arrived on topic '{}' for client '{}'.", mqttMessage.toString(), tempMqttTopic, mqttClientId);
-            logger.error(e);
+            //logger.error(e);
         }
     }
 
@@ -142,12 +148,13 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     @Override
     public void deliveryComplete(IMqttToken iMqttToken) {
+        logger.info("Delivery complete has occurred...");
 
     }
 
     @Override
     public void connectComplete(boolean reconnect, String serverURI) {
-        logger.error("Connect complete has not been implemented...but is it needed?");
+        logger.info("Connection complete reconnect: '{}' and server URI: '{}'", reconnect, serverURI);
     }
 
     @Override
