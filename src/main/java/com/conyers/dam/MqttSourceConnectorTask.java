@@ -13,6 +13,7 @@ import org.eclipse.paho.mqttv5.common.packet.*;
 import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,9 +38,6 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     private void initMqttClient() {
 
-        System.out.println("TESTING DOES THIS HIT...");
-        logger.info("Init mqtt client called");
-        logger.debug("Seeing the debug values...");
         MqttConnectionOptions mqttConnectOptions = new MqttConnectionOptions();
         mqttConnectOptions.setServerURIs(new String[] {connectorConfiguration.getString("mqtt.connector.broker.uri")});
         mqttConnectOptions.setConnectionTimeout(connectorConfiguration.getInt("mqtt.connector.connection_timeout"));
@@ -67,9 +65,9 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
             mqttClient = new MqttClient(connectorConfiguration.getString("mqtt.connector.broker.uri"), mqttClientId, new MemoryPersistence());
             mqttClient.setCallback(this);
             mqttClient.connect(mqttConnectOptions);
-            logger.info("SUCCESSFULL MQTT CONNECTION for AsamMqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
+            logger.info("SUCCESSFULL MQTT CONNECTION for MqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
         } catch (MqttException e) {
-            logger.error("FAILED MQTT CONNECTION for AsamMqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
+            logger.error("FAILED MQTT CONNECTION for MqttSourceConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
             //logger.error(e);
         }
 
@@ -95,13 +93,12 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
         kafkaTopic = connectorConfiguration.getString("mqtt.connector.kafka.topic");
         mqttClientId = connectorConfiguration.getString("mqtt.connector.client.id");
         mqttTopic = connectorConfiguration.getString("mqtt.connector.broker.topic");
-        logger.info("Starting AsamMqttSourceConnectorTask with connector name: '{}'", connectorName);
+        logger.info("Starting MqttSourceConnectorTask with connector name: '{}'", connectorName);
         initMqttClient();
     }
 
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
-        logger.info("Poll has been called...");
         List<SourceRecord> records = new ArrayList<>();
         records.add(mqttRecordQueue.take());
         return records;
@@ -119,14 +116,13 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
 
     @Override
     public void messageArrived(String tempMqttTopic, MqttMessage mqttMessage) {
-        System.out.println("MESSAGE ARRIVED...");
         logger.debug("Mqtt message arrived to connector: '{}', running client: '{}', on topic: '{}'.", connectorName, mqttClientId, tempMqttTopic);
-        logger.info("Mqtt message arrived to connector: '{}', running client: '{}', on topic: '{}'.", connectorName, mqttClientId, tempMqttTopic);
         try {
-            logger.debug("Mqtt message payload in byte array: '{}'", mqttMessage.getPayload());
-            //mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
-            //        Schema.STRING_SCHEMA, addTopicToJSONByteArray(mqttMessage.getPayload(), tempMqttTopic))
-            //);
+            String new_string = new String(mqttMessage.getPayload(), StandardCharsets.UTF_8);
+            logger.debug("Mqtt message payload in byte array: '{}'", new_string);
+            mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
+                    Schema.STRING_SCHEMA, new_string)
+            );
             /*mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
                     Schema.STRING_SCHEMA, makeDBDoc(mqttMessage.getPayload(), tempMqttTopic))
             );*/
