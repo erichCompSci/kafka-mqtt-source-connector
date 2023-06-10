@@ -3,6 +3,8 @@ package com.conyers.dam;
 import com.conyers.dam.util.SSLUtils;
 import com.conyers.dam.util.Version;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
 import org.slf4j.Logger;
@@ -18,17 +20,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
+
+
 public class MqttSourceConnectorTask extends SourceTask implements MqttCallback {
 
     private MqttClient mqttClient;
-    private String kafkaTopic;
-    private String mqttTopic;
+    private List<String> kafkaTypes;
+    private List<String> mqttTopics;
     private String mqttClientId;
     private String connectorName;
     private MqttSourceConnectorConfig connectorConfiguration;
@@ -72,7 +77,9 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
         }
 
         try {
-            mqttClient.subscribe(mqttTopic, connectorConfiguration.getInt("mqtt.connector.qos"));
+            for (String topic : mqttTopics) {
+                mqttClient.subscribe(topic, connectorConfiguration.getInt("mqtt.connector.qos"));
+            }
             logger.info("SUCCESSFULL MQTT CONNECTION for MqttSinkConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
         } catch (MqttException e) {
             logger.error("FAILED MQTT CONNECTION for MqttSinkConnectorTask: '{}, and mqtt client: '{}'.", connectorName, mqttClientId);
@@ -90,9 +97,18 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
     public void start(Map<String, String> map) {
         connectorConfiguration = new MqttSourceConnectorConfig(map);
         connectorName = connectorConfiguration.getString("mqtt.connector.kafka.name");
-        kafkaTopic = connectorConfiguration.getString("mqtt.connector.kafka.topic");
-        mqttClientId = connectorConfiguration.getString("mqtt.connector.client.id");
-        mqttTopic = connectorConfiguration.getString("mqtt.connector.broker.topic");
+        
+        //kafkaTopics     = connectorConfiguration.getList("mqtt.connector.kafka.topics");
+        kafkaTypes      = connectorConfiguration.getList("mqtt.connector.kafka.topic_types");
+        mqttTopics      = connectorConfiguration.getList("mqtt.connector.broker.topics");
+        if(kafkaTypes.size() != mqttTopics.size())
+        {
+            logger.error("Topics size must match mqtt Topics size must match kafka types size, '{}', '{}'", 
+                         kafkaTypes.size(), 
+                         mqttTopics.size());
+            throw new RuntimeException("Topics size and types must match!");
+        }
+        mqttClientId    = connectorConfiguration.getString("mqtt.connector.client.id");
         logger.info("Starting MqttSourceConnectorTask with connector name: '{}'", connectorName);
         initMqttClient();
     }
@@ -109,26 +125,64 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
         logger.info("Stop has been called...");
     }
 
-    /*@Override
-    public void connectionLost(Throwable throwable) {
-        logger.error("Connection for connector: '{}', running client: '{}', lost to topic: '{}'.", connectorName, mqttClientId, mqttTopic);
-    }*/
+    private <T> void submitToQueue(Schema type, T val, String kafkaTopic) {
+        //Map<String, String> source_partition = new HashMap<String, String>();
+        //source_partition.put("source", "mqttClient");
+        //Map<String, Long> source_offset = new HashMap<String, Long>();
+        ////source_offset.put("timestamp", System.currentTimeMillis());
+
+        Schema transferBuilder = SchemaBuilder.struct()
+         .name("com.conyers.dam.MqttTransferStruct").version(1).doc("A struct that can change the internal data type when transfering from mqtt to kafka")
+         .field("timestamp_ms", Schema.INT64_SCHEMA)
+         .field("value", type)
+         .build();
+
+        Struct val_to_send = new Struct(transferBuilder);
+        val_to_send.put("timestamp_ms", System.currentTimeMillis());
+        val_to_send.put("value", val);
+
+        try {
+            mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
+                    transferBuilder, val_to_send)
+            );
+        } catch (Exception e) {
+            logger.error("ERROR: Not able to create source record from kafkaTopic '{}'.", kafkaTopic);
+            //logger.error(e);
+        }
+    }
+
 
     @Override
     public void messageArrived(String tempMqttTopic, MqttMessage mqttMessage) {
         logger.debug("Mqtt message arrived to connector: '{}', running client: '{}', on topic: '{}'.", connectorName, mqttClientId, tempMqttTopic);
-        try {
-            String new_string = new String(mqttMessage.getPayload(), StandardCharsets.UTF_8);
-            logger.debug("Mqtt message payload in byte array: '{}'", new_string);
-            mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
-                    Schema.STRING_SCHEMA, new_string)
-            );
-            /*mqttRecordQueue.put(new SourceRecord(null, null, kafkaTopic, null,
-                    Schema.STRING_SCHEMA, makeDBDoc(mqttMessage.getPayload(), tempMqttTopic))
-            );*/
-        } catch (Exception e) {
-            logger.error("ERROR: Not able to create source record from mqtt message '{}' arrived on topic '{}' for client '{}'.", mqttMessage.toString(), tempMqttTopic, mqttClientId);
-            //logger.error(e);
+            
+        String mqtt_payload = new String(mqttMessage.getPayload(), StandardCharsets.UTF_8);
+
+        int index_of_topic = mqttTopics.indexOf(tempMqttTopic);
+        if(index_of_topic == -1)
+        {
+            logger.error("Topic could not be found in config file: '{}'", tempMqttTopic);
+            return;
+        }
+
+        String k_type = kafkaTypes.get(index_of_topic);
+        if(k_type.equals("int")) {
+            int value = Integer.parseInt(mqtt_payload);
+            submitToQueue(Schema.INT32_SCHEMA, value, tempMqttTopic);
+        } else if(k_type.equals("long")) {
+            long value = Long.parseLong(mqtt_payload);
+            submitToQueue(Schema.INT64_SCHEMA, value, tempMqttTopic);
+        } else if(k_type.equals("float")) {
+            float value = Float.parseFloat(mqtt_payload);
+            submitToQueue(Schema.FLOAT32_SCHEMA, value, tempMqttTopic);
+        } else if(k_type.equals("double")) {
+            double value = Double.parseDouble(mqtt_payload);
+            submitToQueue(Schema.FLOAT64_SCHEMA, value, tempMqttTopic);
+        } else if(k_type.equals("string")) {
+            submitToQueue(Schema.STRING_SCHEMA, mqtt_payload, tempMqttTopic);
+        } else{
+            logger.error("Kafka type did not match any predefined types: '{}'", k_type);
+            throw new RuntimeException("Kafka type did not match any predefined types!");
         }
     }
 
@@ -157,40 +211,5 @@ public class MqttSourceConnectorTask extends SourceTask implements MqttCallback 
     public void authPacketArrived(int reasonCode, MqttProperties properties) {
         logger.error("This has not been implemented yet, do we need it?");
     }
-
-    private byte[] addTopicToJSONByteArray(byte[] bytes, String topic) {
-        String topicAsJSON = ",\"topic\":\""+topic+"\"}";
-        int byteslen = bytes.length-1;
-        int topiclen = topicAsJSON.length();
-        logger.debug("New topic: '{}', for publishing by connector: '{}'", topicAsJSON, connectorName);
-        byte[] byteArrayWithTopic = new byte[byteslen+topiclen];
-        for (int i = 0; i < byteslen; i++) {
-            byteArrayWithTopic[i] = bytes[i];
-        }
-        for (int i = 0; i < topiclen; i++) {
-            byteArrayWithTopic[byteslen+i] = (byte) topicAsJSON.charAt(i);
-        }
-        logger.debug("New payload with topic key/value, as ascii array: '{}'", byteArrayWithTopic);
-        return byteArrayWithTopic;
-    }
-
-    //This is old nonsense code, but I'm keeping it around just in case it has 
-    //valuable information
-    /*private String makeDBDoc(byte[] payload, String topic) {
-      String msg = new String(payload);
-      Document message = Document.parse(msg);
-      Document doc = new Document();
-      List<String> topicArr = Arrays.asList(topic.split("/"));
-      Long unique_id = Long.parseLong(topicArr.get(21));
-      Long quadkey = Long.parseLong(String.join("",topicArr.subList(2,20)));
-      String now = ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
-      Document dt = new Document();
-      dt.put("$date",now);
-      doc.put("message",message);
-      doc.put("unique_id",unique_id);
-      doc.put("quadkey",quadkey);
-      doc.put("updateDate",dt);
-      doc.put("pushed",false);
-      return doc.toJson();
-    }*/
 }
+

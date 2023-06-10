@@ -17,8 +17,6 @@ public class MqttSourceConnectorConfig extends AbstractConfig {
     static ConfigDef configuration = baseConfigDef();
     public MqttSourceConnectorConfig(Map<String, String> properties) {
         super(configuration, properties);
-        //if (getString(AsamMqttSourceConnectorConfig.))
-            //log.info("Initialize transform process properties");
     }
 
     public static ConfigDef baseConfigDef() {
@@ -26,7 +24,7 @@ public class MqttSourceConnectorConfig extends AbstractConfig {
         configDef.define("mqtt.connector.broker.uri", Type.STRING,
                 "tcp://localhost:1883", Importance.HIGH,
                 "Full uri to mqtt broker")
-                .define("mqtt.connector.broker.topic", Type.STRING, "upstream/#", Importance.HIGH,
+                .define("mqtt.connector.broker.topics", Type.LIST, null, Importance.HIGH,
                         "mqtt server to connect to")
                 .define("mqtt.connector.client.id", Type.STRING, "kafka_source_connector", Importance.MEDIUM,
         "mqtt client id to use don't set to use random")
@@ -46,15 +44,17 @@ public class MqttSourceConnectorConfig extends AbstractConfig {
                         "If secure (SSL) then path to client crt is needed.")
                 .define("mqtt.connector.ssl.key", Type.STRING, "./client.key", Importance.LOW,
                         "If secure (SSL) then path to client key is needed.")
-                .define("mqtt.connector.kafka.topic", Type.STRING, "upstream", Importance.MEDIUM,
+                .define("mqtt.connector.kafka.topics", Type.LIST, null, Importance.MEDIUM,
                         "Kafka topic to publish on. This depends on processing unit.")
+                .define("mqtt.connector.kafka.topic_types", Type.LIST, null, Importance.MEDIUM,
+                        "Type of kafka topics.  Can be (int, long, float, double, or string).")
                 .define("mqtt.connector.kafka.name", Type.STRING, "source_kafka", Importance.MEDIUM,
                         "Kafka topic to publish on. This depends on processing unit.");
         return configDef;
     }
 
     public static void main(String[] args) {
-        System.out.println(configuration.toEnrichedRst());
+        log.info(configuration.toEnrichedRst());
     }
 
 
