@@ -11,8 +11,4 @@ RUN sed -i 's/localhost/kafka_main/' /opt/kafka/config/connect-standalone.proper
 RUN echo 'plugin.path=/usr/share/java/kafka' >> /opt/kafka/config/connect-standalone.properties
 
 
-#COPY kafka_start.sh /bin/
-#RUN chmod u+x /bin/kafka_start.sh
-#RUN mkdir /res
-#COPY res/ /res
-#CMD [ "/bin/kafka_start.sh" ]
+ENTRYPOINT ["/opt/kafka/bin/connect-standalone.sh", "/opt/kafka/config/connect-standalone.properties", "/opt/kafka/config/source-connect-mqtt.properties"]
